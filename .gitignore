@@ -6,3 +6,7 @@
 /cifar-100
 /checkpoint/*
 cifar10_worse_labelbest.pth.tar
+aggre_label_detection.npy
+cifar10_aggre_labelbest.pth.tar
+c10_aggre.log
+c10_worst.log

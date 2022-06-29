@@ -254,22 +254,26 @@ def evaluate(loader, model, save = False, best_acc = 0.0):
 
     return acc
 
+def evaluate_detection(noisy_or_not_predict, noisy_or_not_real):
+    precision = np.sum(noisy_or_not_predict * noisy_or_not_real)/np.sum(noisy_or_not_predict)
+    recall = np.sum(noisy_or_not_predict * noisy_or_not_real)/np.sum(noisy_or_not_real)
+    fscore = 2.0 * precision * recall / (precision + recall)
+
+    return precision, recall, fscore
+
 def detection(model):
     model.eval()    # Change model to 'eval' mode.
-
-    pred_list = torch.zeros(50000, num_class)
+    pred_list = torch.zeros(50000)
     num_class = 0
     with torch.no_grad():
         for batch_idx, (inputs, targets, index) in enumerate(eval_loader):
             inputs, targets = inputs.cuda(), targets.cuda()
             outputs = model(inputs)
-            targets_cpu = targets.cpu()
-            pred = torch.softmax(outputs, dim=1).cpu()
+            pred = outputs.max(dim=1)[1].cpu()
             for b in range(inputs.size(0)):
-                targets_list[index[b]] = targets_cpu[b]
                 pred_list[index[b]] = pred[b]
-    detect_res = pred_list != idx2label
-    precision, recall, fscore = evaluate(detect_res, noise_or_not)
+    detect_res = pred_list.long().numpy() != idx2label
+    precision, recall, fscore = evaluate_detection(detect_res, noise_or_not)
     print("noisy - Precision: %.4f, Recall: %.4f, F1: %.4f" % (precision, recall, fscore))
     np.save(args.noise_type + '_detection.npy', detect_res)
 
@@ -428,13 +432,12 @@ for epoch in range(args.num_epochs + 1):
         pred1 = (prob1 > args.p_threshold)
         # print('Train Net1')
         total_trainloader, noisy_labels = loader.run('train', pred1, prob1, prob2)  # co-divide
-    #     train(epoch,dualnet.net1, dualnet.net2, optimizer1, total_trainloader, unlabeled_trainloader) 
+        train(epoch,dualnet.net1, dualnet.net2, optimizer1, total_trainloader, unlabeled_trainloader) 
     
-    # test(epoch, dualnet.net1, dualnet.net2)
-    # torch.save(dualnet, f"./{args.dataset}_{args.noise_type}best.pth.tar")
-
-    if (epoch % 10 == 0 and epoch > 300) or epoch == 0:
+    test(epoch, dualnet.net1, dualnet.net2)
+    torch.save(dualnet, f"./{args.dataset}_{args.noise_type}best.pth.tar")
+    # regard the last ckpt as the best
+    if epoch % 10 == 0 and epoch > 300:
         detection(dualnet)
 
-    # regard the last ckpt as the best
     # best_acc = evaluate(test_loader, dualnet, save = False, best_acc = best_acc)
