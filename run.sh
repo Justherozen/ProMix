@@ -1,0 +1,1 @@
+python Train_dualnet3_submit.py --batch_size 256 --noise_type aggre --num_epochs 800 --cosine --gpuid 0 --data_path ./cifar-10 --dataset cifar10 --num_class 10 --rho_range 0.3,0.5 --threshold 0.99
