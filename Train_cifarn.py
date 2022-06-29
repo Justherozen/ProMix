@@ -268,7 +268,7 @@ def detection(model):
             for b in range(inputs.size(0)):
                 targets_list[index[b]] = targets_cpu[b]
                 pred_list[index[b]] = pred[b]
-
+    predmean_max_all_noise = pred_list != idx2label
 
     return acc
 
