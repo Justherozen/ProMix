@@ -283,5 +283,5 @@ class cifarn_dataloader():
                 batch_size=self.batch_size,
                 shuffle=False,
                 num_workers=self.num_workers)
-            return eval_loader
+            return eval_loader, eval_dataset.noise_or_not
         # never print again

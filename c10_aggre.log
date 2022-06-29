@@ -1,0 +1,6 @@
+Namespace(T=0.5, alpha=4, batch_size=256, cosine=True, data_path='./cifar-10', dataset='cifar10', fmix=False, gpuid=0, id='', is_human=False, low_conf_del=False, lr=0.05, lr_decay_rate=0.1, noise_path=None, noise_type='aggre', num_class=10, num_epochs=420, p_threshold=0.5, pretrain_ep=0, proto_m=0.9, rho_end=0.5, rho_range='0.5,0.5', rho_start=0.5, save_note='', seed=123, start_expand=100, tau=0.99, threshold=0.9, topk=4, unrel_pseudo='sharpen', use_unrel=False, warmup_ep=50)
+| Building net
+Traceback (most recent call last):
+  File "Train_cifarn.py", line 437, in <module>
+    detection(total_trainloader, dualnet)
+NameError: name 'total_trainloader' is not defined

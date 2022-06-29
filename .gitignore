@@ -3,3 +3,4 @@
 /__pycache__
 /cifar-10
 /cifar-100
+cifar10_worse_labelbest.pth.tar

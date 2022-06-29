@@ -268,10 +268,10 @@ def detection(model):
             for b in range(inputs.size(0)):
                 targets_list[index[b]] = targets_cpu[b]
                 pred_list[index[b]] = pred[b]
-    predmean_max_all_noise = pred_list != idx2label
-
-    return acc
-
+    detect_res = pred_list != idx2label
+    precision, recall, fscore = evaluate(detect_res, noise_or_not)
+    print("noisy - Precision: %.4f, Recall: %.4f, F1: %.4f" % (precision, recall, fscore))
+    np.save(args.noise_type + '_detection.npy', detect_res)
 
 def test(epoch, net1, net2):
     net1.eval()
@@ -406,35 +406,34 @@ labeled_trainloader = None
 unlabeled_trainloader = None
 eval_loader = None
 idx2label = (torch.load(args.noise_path))[args.noise_type].reshape(-1)
+test_loader = loader.run('test')
+eval_loader, noise_or_not = loader.run('eval_train')
 
 all_loss = [[], []]  # save the history of losses from two networks
 
 best_acc = 0
 for epoch in range(args.num_epochs + 1):
-
     adjust_learning_rate(args, optimizer1, epoch)
-    test_loader = loader.run('test')
-    eval_loader = loader.run('eval_train')
 
-    if epoch < warm_up:
-        warmup_trainloader, noisy_labels = loader.run('warmup')
+    # if epoch < warm_up:
+    #     warmup_trainloader, noisy_labels = loader.run('warmup')
 
-        print('Warmup Net1')
-        warmup(epoch, dualnet.net1, dualnet.net2, optimizer1, warmup_trainloader)
+    #     print('Warmup Net1')
+    #     warmup(epoch, dualnet.net1, dualnet.net2, optimizer1, warmup_trainloader)
 
-    else:
-        rho = args.rho_start + (args.rho_end - args.rho_start) * linear_rampup2(epoch, args.warmup_ep)
-        prob1, all_loss[0] = eval_train(dualnet.net1, all_loss[0], rho, args.num_class)
-        prob2, all_loss[0] = eval_train(dualnet.net2, all_loss[0], rho, args.num_class)
-        pred1 = (prob1 > args.p_threshold)
-        # print('Train Net1')
-        total_trainloader, noisy_labels = loader.run('train', pred1, prob1, prob2)  # co-divide
-        train(epoch,dualnet.net1, dualnet.net2, optimizer1, total_trainloader, unlabeled_trainloader) 
+    # else:
+    #     rho = args.rho_start + (args.rho_end - args.rho_start) * linear_rampup2(epoch, args.warmup_ep)
+    #     prob1, all_loss[0] = eval_train(dualnet.net1, all_loss[0], rho, args.num_class)
+    #     prob2, all_loss[0] = eval_train(dualnet.net2, all_loss[0], rho, args.num_class)
+    #     pred1 = (prob1 > args.p_threshold)
+    #     # print('Train Net1')
+    #     total_trainloader, noisy_labels = loader.run('train', pred1, prob1, prob2)  # co-divide
+    #     train(epoch,dualnet.net1, dualnet.net2, optimizer1, total_trainloader, unlabeled_trainloader) 
     
-    test(epoch, dualnet.net1, dualnet.net2)
-    torch.save(dualnet, f"./{args.dataset}_{args.noise_type}best.pth.tar")
+    # test(epoch, dualnet.net1, dualnet.net2)
+    # torch.save(dualnet, f"./{args.dataset}_{args.noise_type}best.pth.tar")
 
-    if epoch % 10 == 0 and epoch > 300:
+    if (epoch % 10 == 0 and epoch > 300) or epoch == 0:
         detection(total_trainloader, dualnet)
 
     # regard the last ckpt as the best
