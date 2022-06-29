@@ -434,7 +434,7 @@ for epoch in range(args.num_epochs + 1):
     # torch.save(dualnet, f"./{args.dataset}_{args.noise_type}best.pth.tar")
 
     if (epoch % 10 == 0 and epoch > 300) or epoch == 0:
-        detection(total_trainloader, dualnet)
+        detection(dualnet)
 
     # regard the last ckpt as the best
     # best_acc = evaluate(test_loader, dualnet, save = False, best_acc = best_acc)
