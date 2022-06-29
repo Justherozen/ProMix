@@ -200,7 +200,7 @@ def train(epoch, net, net2, optimizer, labeled_trainloader, unlabeled_trainloade
                             loss_net1.item(), loss_net2.item()))
 
 
-def warmup(epoch, net, net2, optimizer, dataloader, prototypes):
+def warmup(epoch, net, net2, optimizer, dataloader):
     net.train()
     net2.train()
     num_iter = (len(dataloader.dataset) // dataloader.batch_size) + 1
@@ -254,7 +254,34 @@ def evaluate(loader, model, save = False, best_acc = 0.0):
 
     return acc
 
-def test(epoch, net1, net2, prototypes):
+def detection(loader, model):
+    model.eval()    # Change model to 'eval' mode.
+    
+    correct = 0
+    total = 0
+    for batch_idx, (images, labels) in enumerate(loader):
+        images = torch.autograd.Variable(images).cuda()
+        logits = model(images)
+        outputs = F.softmax(logits, dim=1)
+        _, pred = torch.max(outputs.data, 1)
+        total += labels.size(0)
+        correct += (pred.cpu() == labels).sum()
+    acc = 100*float(correct)/float(total)
+    if save:
+        if acc > best_acc:
+            state = {'state_dict': model.state_dict(),
+                     'epoch':epoch,
+                     'acc':acc,
+            }
+            save_path= os.path.join('./', args.noise_type +'best.pth.tar')
+            torch.save(state,save_path)
+            best_acc = acc
+            print(f'model saved to {save_path}!')
+
+    return acc
+
+
+def test(epoch, net1, net2):
     net1.eval()
     net2.eval()
     correct = 0
@@ -383,7 +410,6 @@ CE = nn.CrossEntropyLoss(reduction='none')
 CEloss = nn.CrossEntropyLoss()
 CEsoft = CE_Soft_Label()
 
-prototypes = torch.zeros(args.num_class, 128).cuda()
 labeled_trainloader = None
 unlabeled_trainloader = None
 
@@ -400,7 +426,7 @@ for epoch in range(args.num_epochs + 1):
         warmup_trainloader, noisy_labels = loader.run('warmup')
 
         print('Warmup Net1')
-        warmup(epoch, dualnet.net1, dualnet.net2, optimizer1, warmup_trainloader, prototypes)
+        warmup(epoch, dualnet.net1, dualnet.net2, optimizer1, warmup_trainloader)
 
     else:
         rho = args.rho_start + (args.rho_end - args.rho_start) * linear_rampup2(epoch, args.warmup_ep)
@@ -408,10 +434,14 @@ for epoch in range(args.num_epochs + 1):
         prob2, all_loss[0] = eval_train(dualnet.net2, all_loss[0], rho, args.num_class)
         pred1 = (prob1 > args.p_threshold)
         # print('Train Net1')
-        labeled_trainloader, noisy_labels = loader.run('train', pred1, prob1, prob2)  # co-divide
-        train(epoch,dualnet.net1, dualnet.net2, optimizer1, labeled_trainloader, unlabeled_trainloader) 
+        total_trainloader, noisy_labels = loader.run('train', pred1, prob1, prob2)  # co-divide
+        train(epoch,dualnet.net1, dualnet.net2, optimizer1, total_trainloader, unlabeled_trainloader) 
     
-    test(epoch, dualnet.net1, dualnet.net2, prototypes)
+    test(epoch, dualnet.net1, dualnet.net2)
     torch.save(dualnet, f"./{args.dataset}_{args.noise_type}best.pth.tar")
+
+    if epoch % 10 == 0 and epoch > 300:
+        detection(total_trainloader, dualnet)
+
     # regard the last ckpt as the best
     # best_acc = evaluate(test_loader, dualnet, save = False, best_acc = best_acc)
