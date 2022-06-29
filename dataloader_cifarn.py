@@ -96,12 +96,7 @@ class cifarn_dataset(Dataset):
                 if self.mode == "labeled":
                     pred_idx = pred.nonzero()[0]
                     self.probability = [probability[i] for i in pred_idx]
-
                     clean = (np.array(noise_label) == np.array(train_label))
-                    # auc_meter = AUCMeter()
-                    # auc_meter.reset()
-                    # auc_meter.add(probability, clean)
-                    # auc, _, _ = auc_meter.value()
                     log.write('Numer of labeled samples:%d   AUC (not computed):%.3f\n' % (pred.sum(), 0))
                     log.flush()
 
@@ -131,19 +126,7 @@ class cifarn_dataset(Dataset):
             raise Exception('Input Error')
 
     def __getitem__(self, index):
-        if self.mode == 'labeled':
-            img, target, prob = self.train_data[index], self.noise_label[index], self.probability[index]
-            img = Image.fromarray(img)
-            img1 = self.transform(img)
-            img2 = self.transform_s(img)
-            return img1, img2, target, prob
-        elif self.mode == 'unlabeled':
-            img = self.train_data[index]
-            img = Image.fromarray(img)
-            img1 = self.transform(img)
-            img2 = self.transform_s(img)
-            return img1, img2
-        elif self.mode == 'all_lab':
+        if self.mode == 'all_lab':
             img, target, prob = self.train_data[index], self.noise_label[index], self.probability[index]
             true_labels = self.train_labels[index]
             img = Image.fromarray(img)
@@ -160,12 +143,6 @@ class cifarn_dataset(Dataset):
             else:
                 img = self.transform(img)
                 return img, target, index
-        elif self.mode == 'all2':
-            img, target = self.train_data[index], self.noise_label[index]
-            img = Image.fromarray(img)
-            img1 = self.transform(img)
-            img2 = self.transform_s(img)
-            return img1, img2, target, index
         elif self.mode == 'test':
             img, target = self.test_data[index], self.test_label[index]
             img = Image.fromarray(img)
@@ -247,18 +224,6 @@ class cifarn_dataloader():
                 pin_memory=True,
                 drop_last=True)
 
-            unlabeled_dataset = cifarn_dataset(dataset=self.dataset, noise_type=self.noise_type,
-                                               noise_path=self.noise_path, is_human=self.is_human,
-                                               root_dir=self.root_dir, transform=self.transform_train, mode="unlabeled",
-                                               noise_file=self.noise_file, pred=pred,
-                                               transform_s=self.transform_train_s)
-            unlabeled_trainloader = DataLoader(
-                dataset=unlabeled_dataset,
-                batch_size=self.batch_size,
-                shuffle=True,
-                num_workers=self.num_workers,
-                pin_memory=True,
-                drop_last=True)
             return labeled_trainloader, labeled_dataset.train_noisy_labels
 
         elif mode == 'test':
