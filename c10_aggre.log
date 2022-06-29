@@ -3,4 +3,4 @@ Namespace(T=0.5, alpha=4, batch_size=256, cosine=True, data_path='./cifar-10', d
 Traceback (most recent call last):
   File "Train_cifarn.py", line 437, in <module>
     detection(total_trainloader, dualnet)
-NameError: name 'total_trainloader' is not defined
+TypeError: detection() takes 1 positional argument but 2 were given

@@ -415,19 +415,19 @@ best_acc = 0
 for epoch in range(args.num_epochs + 1):
     adjust_learning_rate(args, optimizer1, epoch)
 
-    # if epoch < warm_up:
-    #     warmup_trainloader, noisy_labels = loader.run('warmup')
+    if epoch < warm_up:
+        warmup_trainloader, noisy_labels = loader.run('warmup')
 
-    #     print('Warmup Net1')
-    #     warmup(epoch, dualnet.net1, dualnet.net2, optimizer1, warmup_trainloader)
+        print('Warmup Net1')
+        warmup(epoch, dualnet.net1, dualnet.net2, optimizer1, warmup_trainloader)
 
-    # else:
-    #     rho = args.rho_start + (args.rho_end - args.rho_start) * linear_rampup2(epoch, args.warmup_ep)
-    #     prob1, all_loss[0] = eval_train(dualnet.net1, all_loss[0], rho, args.num_class)
-    #     prob2, all_loss[0] = eval_train(dualnet.net2, all_loss[0], rho, args.num_class)
-    #     pred1 = (prob1 > args.p_threshold)
-    #     # print('Train Net1')
-    #     total_trainloader, noisy_labels = loader.run('train', pred1, prob1, prob2)  # co-divide
+    else:
+        rho = args.rho_start + (args.rho_end - args.rho_start) * linear_rampup2(epoch, args.warmup_ep)
+        prob1, all_loss[0] = eval_train(dualnet.net1, all_loss[0], rho, args.num_class)
+        prob2, all_loss[0] = eval_train(dualnet.net2, all_loss[0], rho, args.num_class)
+        pred1 = (prob1 > args.p_threshold)
+        # print('Train Net1')
+        total_trainloader, noisy_labels = loader.run('train', pred1, prob1, prob2)  # co-divide
     #     train(epoch,dualnet.net1, dualnet.net2, optimizer1, total_trainloader, unlabeled_trainloader) 
     
     # test(epoch, dualnet.net1, dualnet.net2)
