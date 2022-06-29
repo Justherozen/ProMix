@@ -10,7 +10,6 @@ import os
 import argparse
 import numpy as np
 from PreResNet import *
-# from wideresnet import SupConWideResNet
 from sklearn.mixture import GaussianMixture
 import dataloader_cifarn as dataloader
 from utils import *
@@ -77,7 +76,6 @@ if args.data_path is None:
     elif args.dataset == 'cifar100':
         args.data_path = './cifar-100'
     else:
-        # raise NameError(f'Undefined dataset {args.dataset}')
         pass
 
 if args.noise_path is None:
@@ -86,18 +84,12 @@ if args.noise_path is None:
     elif args.dataset == 'cifar100':
         args.noise_path = './data/CIFAR-100_human.pt'
     else:
-        # raise NameError(f'Undefined dataset {args.dataset}')
         pass
 
 def selection(batch_size, rho, pseudo_loss_vec, pred, pseudo_labels):
     idx_chosen_sm = []
     weights_sl = torch.zeros(pred.shape[0]).cuda().detach()
     weights_hc = torch.zeros(pred.shape[0]).cuda().detach()
-    # small loss selection
-    # idx = pseudo_loss_vec.sort()[1]
-    # idx_chosen_sm = idx[:int(batch_size* rho)]
-    # weights_sl[idx_chosen_sm] = 1
-
     pseudo_label_idx = pseudo_labels.max(dim=1)[1]
     idx_chosen_sm = []
     for j in range(pred.shape[1]):
@@ -114,15 +106,8 @@ def selection(batch_size, rho, pseudo_loss_vec, pred, pseudo_labels):
     idx_chosen_sm = np.concatenate(idx_chosen_sm)
     weights_sl[idx_chosen_sm] = 1
 
-    # high confidence selection
-    # high_conf_cond = pred.max(dim=1)[0] > args.tau
     high_conf_cond = (pseudo_labels * pred).sum(dim=1) > args.tau
     weights_hc[high_conf_cond] = 1
-    # weights_hc_large = 1 * ((weights_hc - weights_sl) == 1)
-    # hc_not_sl_cond = weights_hc_large == 1
-    # pred_pseudo_labels = pred.max(dim=1)[1]
-    # pseudo_labels[hc_not_sl_cond] = F.one_hot(pred_pseudo_labels[hc_not_sl_cond], pred.shape[1]).float()
-    # change the pseudo-labels to prediction itself on high-conf data
     weights = ((weights_hc + weights_sl) > 0) * 1
 
     idx_chosen = torch.where(weights == 1)[0]
@@ -130,13 +115,12 @@ def selection(batch_size, rho, pseudo_loss_vec, pred, pseudo_labels):
     return idx_chosen, idx_unchosen, weights
 
 # Training
-def train(epoch, net, net2, optimizer, labeled_trainloader, unlabeled_trainloader, prototypes):
+def train(epoch, net, net2, optimizer, labeled_trainloader, unlabeled_trainloader):
     net.train()
     net2.train()  # fix one network and train the other
     
     rho = args.rho_start + (args.rho_end - args.rho_start) * linear_rampup2(epoch, args.warmup_ep)
     w = linear_rampup2(epoch, args.warmup_ep)
-    # beta = 0.1 + 0.9 * linear_rampup2(epoch, 800)
     beta = 0.1
 
     # args.tau = 0.99 if epoch < args.num_epochs - 100 else 0.98
@@ -146,77 +130,72 @@ def train(epoch, net, net2, optimizer, labeled_trainloader, unlabeled_trainloade
     trues_list = []
     unrel_pseudo_list = []
 
+    #unlabeled_train_iter = iter(unlabeled_trainloader)
     num_iter = (len(labeled_trainloader.dataset) // args.batch_size) + 1
-    for batch_idx, (inputs_x, inputs_x2, labels_x, w_x, true_labels, index) in enumerate(labeled_trainloader):
+    for batch_idx, (inputs_x, inputs_x2, labels_x, w_x, w_x2, true_labels, index) in enumerate(labeled_trainloader):
         batch_size = inputs_x.size(0)
 
         # Transform label to one-hot
         labels_x = torch.zeros(batch_size, args.num_class).scatter_(1, labels_x.view(-1, 1), 1)
         w_x = w_x.view(-1, 1).type(torch.FloatTensor)
+        w_x2 = w_x2.view(-1, 1).type(torch.FloatTensor)
 
         index = index.cuda()
-        inputs_x, inputs_x2, labels_x, w_x = inputs_x.cuda(), inputs_x2.cuda(), labels_x.cuda(), w_x.cuda()
-        outputs_x = net(inputs_x)
-        outputs_x2 = net(inputs_x2)
-        outputs_a = net2(inputs_x)
-        outputs_a2 = net2(inputs_x2)
-        # net1 for classifier, net2 for contrastive learning
+        inputs_x, inputs_x2, labels_x, w_x , w_x2= inputs_x.cuda(), inputs_x2.cuda(), labels_x.cuda(), w_x.cuda(), w_x2.cuda()
+        outputs_x, _ = net(inputs_x, train=True)
+        outputs_x2, _ = net(inputs_x2, train=True)
+        outputs_a, _ = net2(inputs_x, train=True)
+        outputs_a2, _ = net2(inputs_x2, train=True)
         
         with torch.no_grad():
             # label refinement of labeled samples
             px = torch.softmax(outputs_x, dim=1)
             px2 = torch.softmax(outputs_a, dim=1)
+            pred_net = F.one_hot(px.max(dim=1)[1], args.num_class).float()
             pred_net2 = F.one_hot(px2.max(dim=1)[1], args.num_class).float()
 
             targets_x = labels_x.clone().detach()
 
-            # pseudo_loss_vec_l = CEsoft(outputs_x, targets=targets_x)
-            # idx_chosen, idx_unchosen, weights = selection(batch_size, rho, pseudo_loss_vec_l, px, targets_x)
-
             high_conf_cond = (labels_x * px).sum(dim=1) > args.tau
+            high_conf_cond2 = (labels_x * px2).sum(dim=1) > args.tau
             w_x[high_conf_cond] = 1
+            w_x2[high_conf_cond2] = 1
+            pseudo_label_l = targets_x * w_x + pred_net * (1 - w_x)
+            pseudo_label_l2 = targets_x * w_x2 + pred_net2 * (1 - w_x2)
+
+            # both nets agrees
             idx_chosen = torch.where(w_x == 1)[0]
-            idx_unchosen = torch.where(w_x == 0)[0]
-            
-            pseudo_label_l = targets_x * w_x + pred_net2 * (1 - w_x)
+            # idx_unchosen = torch.where(w_x == 0)[0]
 
-            w_x2 = w_x.clone()
-            if (1. * idx_chosen.shape[0] / batch_size) < args.threshold:
-                # when clean data is insufficient, try to incorporate more examples
-                score1 = (pseudo_label_l * px).sum(dim=1)
-                score2 = (pseudo_label_l * px2).sum(dim=1)
-                high_conf_cond2 = (score1 > args.tau) * (score2 > args.tau)
-                # both nets agrees
-                high_conf_cond2 = (1. * high_conf_cond2 - w_x.squeeze()) > 0
-                # remove already selected examples; newly selected
-                hc2_idx = torch.where(high_conf_cond2)[0]
+            idx_chosen_2 = torch.where(w_x2 == 1)[0]
+            # idx_unchosen_2 = torch.where(w_x2 == 0)[0]
 
-                max_to_sel_num = int(batch_size * args.threshold) - idx_chosen.shape[0]
-                # maximally select batch_size * args.threshold; idx_chosen.shape[0] select already
-                if high_conf_cond2.sum() > max_to_sel_num:
-                    # to many examples selected, remove some low conf examples
-                    score_mean = ((pseudo_label_l * px2).sum(dim=1) + (pseudo_label_l * px).sum(dim=1)) / 2
-                    idx_remove = (-score_mean[hc2_idx]).sort()[1][max_to_sel_num:]
-                    # take top scores
-                    high_conf_cond2[hc2_idx[idx_remove]] = False
-                w_x2[high_conf_cond2] = 1
-            idx_chosen_new = torch.where(w_x2 == 1)[0]
-            # idx_unchosen_new = torch.where(w_x2 == 0)[0]
+            if epoch > args.num_epochs - args.start_expand:
+                # only add these points at the last 100 epochs
+                score1 = px.max(dim=1)[0]
+                score2 = px2.max(dim=1)[0]
+                match = px.max(dim=1)[1] == px2.max(dim=1)[1]
+
+                hc2_sel_wx1 = high_conf_sel2(idx_chosen, w_x, batch_size, score1, score2, match)
+                hc2_sel_wx2 = high_conf_sel2(idx_chosen_2, w_x2, batch_size, score1, score2, match)
+
+                idx_chosen = torch.where(hc2_sel_wx1 == 1)[0]
+                idx_chosen_2 = torch.where(hc2_sel_wx2 == 1)[0]
 
             trues_list.append(true_labels)
             filters = torch.zeros(true_labels.shape[0])
-            filters[idx_chosen_new.cpu()] = 1
+            filters[idx_chosen.cpu()] = 1
             pseudo_filtered_list.append(filters)
             pseudo_labels_list.append(pseudo_label_l.cpu())
 
         l = np.random.beta(4, 4)
         l = max(l, 1-l)
-        X_w_c = inputs_x[idx_chosen_new]
-        pseudo_label_c = pseudo_label_l[idx_chosen_new]
+        X_w_c = inputs_x[idx_chosen]
+        pseudo_label_c = pseudo_label_l[idx_chosen]
         idx = torch.randperm(X_w_c.size(0))
         X_w_c_rand = X_w_c[idx]
         pseudo_label_c_rand = pseudo_label_c[idx]
-        X_w_c_mix = l * X_w_c + (1 - l) * X_w_c_rand        
+        X_w_c_mix = l * X_w_c + (1 - l) * X_w_c_rand
         pseudo_label_c_mix = l * pseudo_label_c + (1 - l) * pseudo_label_c_rand
         logits_mix = net(X_w_c_mix)
         loss_mix = CEsoft(logits_mix, targets=pseudo_label_c_mix).mean()
@@ -226,42 +205,20 @@ def train(epoch, net, net2, optimizer, labeled_trainloader, unlabeled_trainloade
         loss_fmix = fmix.loss(logits_fmix, (pseudo_label_c.detach()).long())
         # fmixup loss
         
-        loss_cr = CEsoft(outputs_x2[idx_chosen_new], targets=pseudo_label_l[idx_chosen_new]).mean()
+        loss_cr = CEsoft(outputs_x2[idx_chosen], targets=pseudo_label_l[idx_chosen]).mean()
         # consistency loss
         
-        loss_ce = CEsoft(outputs_x[idx_chosen_new], targets=pseudo_label_l[idx_chosen_new]).mean()
+        loss_ce = CEsoft(outputs_x[idx_chosen], targets=pseudo_label_l[idx_chosen]).mean()
         # above: loss for reliable samples
 
-        # ptx = px ** (1 / args.T)
-        # ptx = ptx / ptx.sum(dim=1, keepdim=True)
-        # targets_urel = ptx.detach()
-        # # unrel_pseudo_list.append(targets_urel.cpu())
-
-        # loss_urel = CEsoft(outputs_x[idx_unchosen_new], targets=targets_urel[idx_unchosen_new]).mean()\
-        #           + w * CEsoft(outputs_x2[idx_unchosen_new], targets=targets_urel[idx_unchosen_new]).mean()
-        # # consistency loss on unreliable examples
-        # # above: loss for unreliable samples
-        
         loss_net1 = loss_ce + w * (loss_cr + loss_mix + loss_fmix)
+        #  -------  loss for net1
 
-        #  -------  loss for net2
-        # pred_net2 = F.one_hot(px2.max(dim=1)[1], args.num_class).float()
-        # pseudo_label_l2 = targets_x * w_x + pred_net2 * (1 - w_x)
-        pseudo_label_l2 = pseudo_label_l
         unrel_pseudo_list.append(px2.cpu())
-
-        high_conf_cond2 = px2.max(dim=1)[0] > args.tau
-        w_x[high_conf_cond2] = 1
-        idx_chosen = torch.where(w_x == 1)[0]
-        idx_unchosen = torch.where(w_x == 0)[0]
-
-        # idx_chosen = idx_chosen_new
-        # idx_unchosen = idx_unchosen_new
-
         l = np.random.beta(4, 4)
         l = max(l, 1-l)
-        X_w_c = inputs_x[idx_chosen]
-        pseudo_label_c = pseudo_label_l2[idx_chosen]
+        X_w_c = inputs_x[idx_chosen_2]
+        pseudo_label_c = pseudo_label_l2[idx_chosen_2]
         idx = torch.randperm(X_w_c.size(0))
         X_w_c_rand = X_w_c[idx]
         pseudo_label_c_rand = pseudo_label_c[idx]
@@ -274,15 +231,10 @@ def train(epoch, net, net2, optimizer, labeled_trainloader, unlabeled_trainloade
         logits_fmix2 = net2(x_fmix2)
         loss_fmix2 = fmix.loss(logits_fmix2, (pseudo_label_c.detach()).long())
         # fmixup loss
-
-        loss_cr2 = CEsoft(outputs_a2[idx_chosen], targets=pseudo_label_l2[idx_chosen]).mean()
+        loss_cr2 = CEsoft(outputs_a2[idx_chosen_2], targets=pseudo_label_l2[idx_chosen_2]).mean()
         # consistency loss
-        
-        loss_ce2 = CEsoft(outputs_a[idx_chosen], targets=pseudo_label_l2[idx_chosen]).mean()
-
+        loss_ce2 = CEsoft(outputs_a[idx_chosen_2], targets=pseudo_label_l2[idx_chosen_2]).mean()
         loss_net2 = loss_ce2 + w * (loss_cr2 + loss_mix2 + loss_fmix2)
-        # the loss of the contrastive branch
-
         loss = loss_net1 + loss_net2
         
         # compute gradient and do SGD step
@@ -446,14 +398,10 @@ def eval_train(model, all_loss, rho, num_class):
         # at least one example
         idx_chosen_sm.append(indices[sorted_idx_j[:partition_j]])
         min_len = min(min_len, partition_j)
-    # idx_chosen_sm = [x[:min_len] for x in idx_chosen_sm]
+
     idx_chosen_sm = np.concatenate(idx_chosen_sm)
     prob[idx_chosen_sm] = 1
     
-    # pseudo_labels = F.one_hot(targets_list.long(), num_class)
-    # prod = pseudo_labels * pred_list
-    # high_conf_cond = (pseudo_labels * pred_list).sum(dim=1) > args.tau
-    # prob[high_conf_cond] = 1
 
     return prob, all_loss
 
@@ -482,7 +430,6 @@ class NegEntropy(object):
 
 def create_model():
     model = DualNet(args)
-    # model = SupConWideResNet(num_class=args.num_class)
     model = model.cuda()
     return model
 
@@ -506,8 +453,6 @@ conf_penalty = NegEntropy()
 optimizer1 = optim.SGD([{'params': dualnet.net1.parameters()},
                         {'params': dualnet.net2.parameters()}
                         ], lr=args.lr, momentum=0.9, weight_decay=5e-4)
-# optimizer1 = optim.SGD(net1.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
-# optimizer2 = optim.SGD(net2.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
 
 fmix = FMix()
 
@@ -520,7 +465,7 @@ labeled_trainloader = None
 unlabeled_trainloader = None
 
 all_loss = [[], []]  # save the history of losses from two networks
-# with torch.autograd.detect_anomaly():
+
 best_acc = 0
 for epoch in range(args.num_epochs + 1):
 
@@ -539,18 +484,11 @@ for epoch in range(args.num_epochs + 1):
     else:
         rho = args.rho_start + (args.rho_end - args.rho_start) * linear_rampup2(epoch, args.warmup_ep)
         prob1, all_loss[0] = eval_train(dualnet.net1, all_loss[0], rho, args.num_class)
-
         pred1 = (prob1 > args.p_threshold)
-
-        # print('Train Net1')
-        labeled_trainloader, noisy_labels = loader.run('train', pred1, prob1)  # co-divide
-
+        labeled_trainloader, noisy_labels = loader.run('train', pred1, prob1)  
         train(epoch, dualnet.net1, dualnet.net2, optimizer1, labeled_trainloader, unlabeled_trainloader, prototypes)  # train net1
 
-        # print('\nTrain Net2')
-        # labeled_trainloader, unlabeled_trainloader = loader.run('train', pred1, prob1)  # co-divide
-        # train(epoch, net2, net1, optimizer2, labeled_trainloader, unlabeled_trainloader, queue)  # train dualnet.net2
-
+    
     test(epoch, dualnet.net1, dualnet.net2, prototypes)
     torch.save(dualnet, os.path.join('./checkpoint/'+str(args.noise_type)+'_'+str(epoch)+'.pth'))
     best_acc = evaluate(test_loader, dualnet, save = False, best_acc = best_acc)
