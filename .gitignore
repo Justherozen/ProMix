@@ -1,0 +1,5 @@
+/data/*.npy
+/data/*.pt
+/__pycache__
+/cifar-10
+/cifar-100

@@ -84,34 +84,6 @@ if args.noise_path is None:
     else:
         pass
 
-def selection(batch_size, rho, pseudo_loss_vec, pred, pseudo_labels):
-    idx_chosen_sm = []
-    weights_sl = torch.zeros(pred.shape[0]).cuda().detach()
-    weights_hc = torch.zeros(pred.shape[0]).cuda().detach()
-    pseudo_label_idx = pseudo_labels.max(dim=1)[1]
-    idx_chosen_sm = []
-    for j in range(pred.shape[1]):
-        indices = np.where(pseudo_label_idx.cpu().numpy()==j)[0]
-        # torch.where will cause device error
-        if len(indices) == 0:
-            continue
-        bs_j = batch_size * (1. / pred.shape[1])
-        pseudo_loss_vec_j = pseudo_loss_vec[indices]
-        sorted_idx_j = pseudo_loss_vec_j.sort()[1].cpu().numpy()
-        partition_j = max(min(int(math.ceil(bs_j*rho)), len(indices)), 1)
-        # at least one example
-        idx_chosen_sm.append(indices[sorted_idx_j[:partition_j]])
-    idx_chosen_sm = np.concatenate(idx_chosen_sm)
-    weights_sl[idx_chosen_sm] = 1
-
-    high_conf_cond = (pseudo_labels * pred).sum(dim=1) > args.tau
-    weights_hc[high_conf_cond] = 1
-    weights = ((weights_hc + weights_sl) > 0) * 1
-
-    idx_chosen = torch.where(weights == 1)[0]
-    idx_unchosen = torch.where(weights == 0)[0]
-    return idx_chosen, idx_unchosen, weights
-
 # Training
 def train(epoch, net, net2, optimizer, labeled_trainloader, unlabeled_trainloader):
     net.train()
@@ -120,13 +92,6 @@ def train(epoch, net, net2, optimizer, labeled_trainloader, unlabeled_trainloade
     rho = args.rho_start + (args.rho_end - args.rho_start) * linear_rampup2(epoch, args.warmup_ep)
     w = linear_rampup2(epoch, args.warmup_ep)
     beta = 0.1
-
-    # args.tau = 0.99 if epoch < args.num_epochs - 100 else 0.98
-
-    pseudo_filtered_list = []
-    pseudo_labels_list = []
-    trues_list = []
-    unrel_pseudo_list = []
 
     #unlabeled_train_iter = iter(unlabeled_trainloader)
     num_iter = (len(labeled_trainloader.dataset) // args.batch_size) + 1
@@ -140,10 +105,10 @@ def train(epoch, net, net2, optimizer, labeled_trainloader, unlabeled_trainloade
 
         index = index.cuda()
         inputs_x, inputs_x2, labels_x, w_x , w_x2= inputs_x.cuda(), inputs_x2.cuda(), labels_x.cuda(), w_x.cuda(), w_x2.cuda()
-        outputs_x, _ = net(inputs_x, train=True)
-        outputs_x2, _ = net(inputs_x2, train=True)
-        outputs_a, _ = net2(inputs_x, train=True)
-        outputs_a2, _ = net2(inputs_x2, train=True)
+        outputs_x = net(inputs_x)
+        outputs_x2 = net(inputs_x2)
+        outputs_a = net2(inputs_x)
+        outputs_a2 = net2(inputs_x2)
         
         with torch.no_grad():
             # label refinement of labeled samples
@@ -152,21 +117,16 @@ def train(epoch, net, net2, optimizer, labeled_trainloader, unlabeled_trainloade
             pred_net = F.one_hot(px.max(dim=1)[1], args.num_class).float()
             pred_net2 = F.one_hot(px2.max(dim=1)[1], args.num_class).float()
 
-            targets_x = labels_x.clone().detach()
-
             high_conf_cond = (labels_x * px).sum(dim=1) > args.tau
             high_conf_cond2 = (labels_x * px2).sum(dim=1) > args.tau
             w_x[high_conf_cond] = 1
             w_x2[high_conf_cond2] = 1
-            pseudo_label_l = targets_x * w_x + pred_net * (1 - w_x)
-            pseudo_label_l2 = targets_x * w_x2 + pred_net2 * (1 - w_x2)
+            pseudo_label_l = labels_x * w_x + pred_net * (1 - w_x)
+            pseudo_label_l2 = labels_x * w_x2 + pred_net2 * (1 - w_x2)
 
-            # both nets agrees
             idx_chosen = torch.where(w_x == 1)[0]
-            # idx_unchosen = torch.where(w_x == 0)[0]
-
             idx_chosen_2 = torch.where(w_x2 == 1)[0]
-            # idx_unchosen_2 = torch.where(w_x2 == 0)[0]
+            # selected examples
 
             if epoch > args.num_epochs - args.start_expand:
                 # only add these points at the last 100 epochs
@@ -179,12 +139,7 @@ def train(epoch, net, net2, optimizer, labeled_trainloader, unlabeled_trainloade
 
                 idx_chosen = torch.where(hc2_sel_wx1 == 1)[0]
                 idx_chosen_2 = torch.where(hc2_sel_wx2 == 1)[0]
-
-            trues_list.append(true_labels)
-            filters = torch.zeros(true_labels.shape[0])
-            filters[idx_chosen.cpu()] = 1
-            pseudo_filtered_list.append(filters)
-            pseudo_labels_list.append(pseudo_label_l.cpu())
+            # Label Guessing
 
         l = np.random.beta(4, 4)
         l = max(l, 1-l)
@@ -202,17 +157,14 @@ def train(epoch, net, net2, optimizer, labeled_trainloader, unlabeled_trainloade
         logits_fmix = net(x_fmix)
         loss_fmix = fmix.loss(logits_fmix, (pseudo_label_c.detach()).long())
         # fmixup loss
-        
         loss_cr = CEsoft(outputs_x2[idx_chosen], targets=pseudo_label_l[idx_chosen]).mean()
         # consistency loss
-        
         loss_ce = CEsoft(outputs_x[idx_chosen], targets=pseudo_label_l[idx_chosen]).mean()
         # above: loss for reliable samples
 
         loss_net1 = loss_ce + w * (loss_cr + loss_mix + loss_fmix)
         #  -------  loss for net1
 
-        unrel_pseudo_list.append(px2.cpu())
         l = np.random.beta(4, 4)
         l = max(l, 1-l)
         X_w_c = inputs_x[idx_chosen_2]
@@ -233,6 +185,8 @@ def train(epoch, net, net2, optimizer, labeled_trainloader, unlabeled_trainloade
         # consistency loss
         loss_ce2 = CEsoft(outputs_a[idx_chosen_2], targets=pseudo_label_l2[idx_chosen_2]).mean()
         loss_net2 = loss_ce2 + w * (loss_cr2 + loss_mix2 + loss_fmix2)
+        #  -------  loss for net2
+
         loss = loss_net1 + loss_net2
         
         # compute gradient and do SGD step
@@ -244,27 +198,6 @@ def train(epoch, net, net2, optimizer, labeled_trainloader, unlabeled_trainloade
             print('%s:%s | Epoch [%3d/%3d] Iter[%3d/%3d]\t Net1 loss: %.2f  Net2 loss: %.2f'
                          % (args.dataset, args.noise_type, epoch, args.num_epochs, batch_idx + 1, num_iter,
                             loss_net1.item(), loss_net2.item()))
-
-    pseudo_labels_list = torch.cat(pseudo_labels_list, dim=0)
-    pseudo_filtered_list = torch.cat(pseudo_filtered_list, dim=0)
-    trues_list = torch.cat(trues_list, dim=0)
-    unrel_pseudo_list = torch.cat(unrel_pseudo_list, dim=0)
-    compare = (pseudo_labels_list.max(dim=1)[1] == trues_list) * 1
-    compare_unrel = (unrel_pseudo_list.max(dim=1)[1] == trues_list) * 1
-
-    all_selected = pseudo_filtered_list.sum().numpy()
-    print('Selected: {} ({:.2f}%)'.format(
-        all_selected,
-        100 * all_selected/len(pseudo_labels_list)))
-    print('Per-Class selected: ', [int((trues_list[pseudo_filtered_list==1]==i).sum()) for i in range(args.num_class)])
-    print('Max prototype prediction: {}'.format(unrel_pseudo_list.max(dim=1)[0].mean()))
-    print('Rho {:.2f}, Pseudo Acc: {:.2f}, Filtered Acc: {:.2f}, Unrel Acc: {:.2f}'.format(
-        rho,
-        int(compare.sum()) / len(trues_list),
-        int((compare * pseudo_filtered_list).sum()) / float(pseudo_filtered_list.sum()),
-        int((compare_unrel * (1 - pseudo_filtered_list)).sum()) / float((1 - pseudo_filtered_list).sum())
-        ))
-    # print('Per Class Accuracy: ', 1)
 
 
 def warmup(epoch, net, net2, optimizer, dataloader, prototypes):
@@ -327,7 +260,6 @@ def test(epoch, net1, net2, prototypes):
     correct = 0
     correct2 = 0
     correctmean = 0
-    correctmax = 0
     total = 0
     with torch.no_grad():
         for batch_idx, (inputs, targets) in enumerate(test_loader):
@@ -339,20 +271,15 @@ def test(epoch, net1, net2, prototypes):
             score2, predicted_2 = torch.max(outputs2, 1)
             outputs_mean = (outputs1 + outputs2) / 2
             _, predicted_mean = torch.max(outputs_mean, 1)
-            max1_idx = torch.where(score1 > score2)
-            predicted_max = predicted_2.clone().detach()
-            predicted_max[max1_idx] = predicted[max1_idx]
 
             total += targets.size(0)
             correct += predicted.eq(targets).cpu().sum().item()
             correct2 += predicted_2.eq(targets).cpu().sum().item()
             correctmean += predicted_mean.eq(targets).cpu().sum().item()
-            correctmax += predicted_max.eq(targets).cpu().sum().item()
     acc = 100. * correct / total
     acc2 = 100. * correct2 / total
     accmean = 100. * correctmean / total
-    accmax = 100. * correctmax / total
-    print("| Test Epoch #%d\t Acc Net1: %.2f%%, Acc Net2: %.2f%% Acc Mean: %.2f%% Acc Max: %.2f%%\n" % (epoch, acc, acc2,accmean,accmax))
+    print("| Test Epoch #%d\t Acc Net1: %.2f%%, Acc Net2: %.2f%% Acc Mean: %.2f%%\n" % (epoch, acc, acc2, accmean))
     test_log.write('Epoch:%d   Accuracy:%.2f\n' % (epoch, acc))
     test_log.flush()
 
@@ -399,7 +326,6 @@ def eval_train(model, all_loss, rho, num_class):
 
     idx_chosen_sm = np.concatenate(idx_chosen_sm)
     prob[idx_chosen_sm] = 1
-    
 
     return prob, all_loss
 
@@ -427,7 +353,7 @@ class NegEntropy(object):
 
 
 def create_model():
-    model = DualNet(args)
+    model = DualNet(args.num_class)
     model = model.cuda()
     return model
 
@@ -453,7 +379,6 @@ optimizer1 = optim.SGD([{'params': dualnet.net1.parameters()},
                         ], lr=args.lr, momentum=0.9, weight_decay=5e-4)
 
 fmix = FMix()
-
 CE = nn.CrossEntropyLoss(reduction='none')
 CEloss = nn.CrossEntropyLoss()
 CEsoft = CE_Soft_Label()
@@ -473,8 +398,6 @@ for epoch in range(args.num_epochs + 1):
 
     if epoch < warm_up:
         warmup_trainloader, noisy_labels = loader.run('warmup')
-        if CEsoft.confidence is None:
-            CEsoft.init_confidence(noisy_labels, args.num_class)
 
         print('Warmup Net1')
         warmup(epoch, dualnet.net1, dualnet.net2, optimizer1, warmup_trainloader, prototypes)
@@ -487,8 +410,8 @@ for epoch in range(args.num_epochs + 1):
         # print('Train Net1')
         labeled_trainloader, noisy_labels = loader.run('train', pred1, prob1, prob2)  # co-divide
         train(epoch,dualnet.net1, dualnet.net2, optimizer1, labeled_trainloader, unlabeled_trainloader) 
-
     
     test(epoch, dualnet.net1, dualnet.net2, prototypes)
-    torch.save(dualnet, os.path.join('./checkpoint/'+str(args.noise_type)+'_'+str(epoch)+'.pth'))
-    best_acc = evaluate(test_loader, dualnet, save = False, best_acc = best_acc)
+    torch.save(dualnet, f"./{args.dataset}_{args.noise_type}best.pth.tar")
+    # regard the last ckpt as the best
+    # best_acc = evaluate(test_loader, dualnet, save = False, best_acc = best_acc)
