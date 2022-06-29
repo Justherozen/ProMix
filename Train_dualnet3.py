@@ -20,8 +20,6 @@ parser.add_argument('--batch_size', default=64, type=int, help='train batchsize'
 parser.add_argument('--lr', '--learning_rate', default=0.02, type=float, help='initial learning rate')
 parser.add_argument('-lr_decay_rate', type=float, default=0.1,
                     help='decay rate for learning rate')
-parser.add_argument('-lr_decay_epochs', type=str, default='100,200,300',
-                    help='where to decay lr, can be a list')
 parser.add_argument('--cosine', action='store_true', default=False,
                     help='use cosine lr schedule')
 parser.add_argument('--noise_type', type=str, help='clean, aggre, worst, rand1, rand2, rand3, clean100, noisy100',
@@ -43,20 +41,20 @@ parser.add_argument('--rho_range', default='0.2,0.6', type=str,
                     help='ratio of clean labels (rho)')
 parser.add_argument('--tau', default=0.99, type=float,
                     help='high-confidence selection threshold')
-parser.add_argument('--pretrain_ep', default=0, type=int)
+parser.add_argument('--pretrain_ep', default=10, type=int)
 parser.add_argument('--warmup_ep', default=50, type=int)
 parser.add_argument('--topk', default=4, type=int)
 parser.add_argument('--unrel_pseudo', default='sharpen', type=str)
 parser.add_argument('--low_conf_del', action='store_true', default=False)
 parser.add_argument('--threshold', default=0.95, type=float)
+parser.add_argument('--fmix', action='store_true', default=False)
+parser.add_argument('--use_unrel', action='store_true', default=False)
+parser.add_argument('--start_expand', default=100, type=int)
+parser.add_argument('--save_note', type=str,  default='')
 
 
 args = parser.parse_args()
 [args.rho_start, args.rho_end] = [float(item) for item in args.rho_range.split(',')]
-iterations = args.lr_decay_epochs.split(',')
-args.lr_decay_epochs = list([])
-for it in iterations:
-    args.lr_decay_epochs.append(int(it))
 print(args)
 
 torch.cuda.set_device(args.gpuid)
@@ -484,9 +482,11 @@ for epoch in range(args.num_epochs + 1):
     else:
         rho = args.rho_start + (args.rho_end - args.rho_start) * linear_rampup2(epoch, args.warmup_ep)
         prob1, all_loss[0] = eval_train(dualnet.net1, all_loss[0], rho, args.num_class)
+        prob2, all_loss[0] = eval_train(dualnet.net2, all_loss[0], rho, args.num_class)
         pred1 = (prob1 > args.p_threshold)
-        labeled_trainloader, noisy_labels = loader.run('train', pred1, prob1)  
-        train(epoch, dualnet.net1, dualnet.net2, optimizer1, labeled_trainloader, unlabeled_trainloader, prototypes)  # train net1
+        # print('Train Net1')
+        labeled_trainloader, noisy_labels = loader.run('train', pred1, prob1, prob2)  # co-divide
+        train(epoch,dualnet.net1, dualnet.net2, optimizer1, labeled_trainloader, unlabeled_trainloader) 
 
     
     test(epoch, dualnet.net1, dualnet.net2, prototypes)

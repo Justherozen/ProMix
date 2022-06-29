@@ -21,7 +21,7 @@ def unpickle(file):
 
 class cifarn_dataset(Dataset):
     def __init__(self, dataset, noise_type, noise_path, root_dir, transform, mode, transform_s=None, is_human=True, noise_file='',
-                 pred=[], probability=[], log='', print_show=False):
+                 pred=[], probability=[],probability2=[] ,log='', print_show=False):
         self.dataset = dataset
         self.transform = transform
         self.transform_s = transform_s
@@ -87,6 +87,7 @@ class cifarn_dataset(Dataset):
 
             if self.mode == 'all_lab':
                 self.probability = probability
+                self.probability2 = probability2
                 self.train_data = train_data
                 self.noise_label = noise_label
             elif self.mode == 'all':
@@ -96,7 +97,12 @@ class cifarn_dataset(Dataset):
                 if self.mode == "labeled":
                     pred_idx = pred.nonzero()[0]
                     self.probability = [probability[i] for i in pred_idx]
+
                     clean = (np.array(noise_label) == np.array(train_label))
+                    # auc_meter = AUCMeter()
+                    # auc_meter.reset()
+                    # auc_meter.add(probability, clean)
+                    # auc, _, _ = auc_meter.value()
                     log.write('Numer of labeled samples:%d   AUC (not computed):%.3f\n' % (pred.sum(), 0))
                     log.flush()
 
@@ -126,13 +132,25 @@ class cifarn_dataset(Dataset):
             raise Exception('Input Error')
 
     def __getitem__(self, index):
-        if self.mode == 'all_lab':
+        if self.mode == 'labeled':
             img, target, prob = self.train_data[index], self.noise_label[index], self.probability[index]
+            img = Image.fromarray(img)
+            img1 = self.transform(img)
+            img2 = self.transform_s(img)
+            return img1, img2, target, prob
+        elif self.mode == 'unlabeled':
+            img = self.train_data[index]
+            img = Image.fromarray(img)
+            img1 = self.transform(img)
+            img2 = self.transform_s(img)
+            return img1, img2
+        elif self.mode == 'all_lab':
+            img, target, prob, prob2 = self.train_data[index], self.noise_label[index], self.probability[index],self.probability2[index]
             true_labels = self.train_labels[index]
             img = Image.fromarray(img)
             img1 = self.transform(img)
             img2 = self.transform_s(img)
-            return img1, img2, target, prob, true_labels, index
+            return img1, img2, target, prob,prob2,true_labels, index
         elif self.mode == 'all':
             img, target = self.train_data[index], self.noise_label[index]
             img = Image.fromarray(img)
@@ -143,6 +161,12 @@ class cifarn_dataset(Dataset):
             else:
                 img = self.transform(img)
                 return img, target, index
+        elif self.mode == 'all2':
+            img, target = self.train_data[index], self.noise_label[index]
+            img = Image.fromarray(img)
+            img1 = self.transform(img)
+            img2 = self.transform_s(img)
+            return img1, img2, target, index
         elif self.mode == 'test':
             img, target = self.test_data[index], self.test_label[index]
             img = Image.fromarray(img)
@@ -195,7 +219,7 @@ class cifarn_dataloader():
             ])
         self.print_show = True
 
-    def run(self, mode, pred=[], prob=[]):
+    def run(self, mode, pred=[], prob=[],prob2=[]):
         if mode == 'warmup':
             all_dataset = cifarn_dataset(dataset=self.dataset, noise_type=self.noise_type, noise_path=self.noise_path,
                                          is_human=self.is_human, root_dir=self.root_dir, transform=self.transform_train,
@@ -214,7 +238,7 @@ class cifarn_dataloader():
             labeled_dataset = cifarn_dataset(dataset=self.dataset, noise_type=self.noise_type,
                                              noise_path=self.noise_path, is_human=self.is_human,
                                              root_dir=self.root_dir, transform=self.transform_train, mode="all_lab",
-                                             noise_file=self.noise_file, pred=pred, probability=prob, log=self.log,
+                                             noise_file=self.noise_file, pred=pred, probability=prob,probability2=prob2, log=self.log,
                                              transform_s=self.transform_train_s)
             labeled_trainloader = DataLoader(
                 dataset=labeled_dataset,
@@ -224,6 +248,18 @@ class cifarn_dataloader():
                 pin_memory=True,
                 drop_last=True)
 
+            unlabeled_dataset = cifarn_dataset(dataset=self.dataset, noise_type=self.noise_type,
+                                               noise_path=self.noise_path, is_human=self.is_human,
+                                               root_dir=self.root_dir, transform=self.transform_train, mode="unlabeled",
+                                               noise_file=self.noise_file, pred=pred,
+                                               transform_s=self.transform_train_s)
+            unlabeled_trainloader = DataLoader(
+                dataset=unlabeled_dataset,
+                batch_size=self.batch_size,
+                shuffle=True,
+                num_workers=self.num_workers,
+                pin_memory=True,
+                drop_last=True)
             return labeled_trainloader, labeled_dataset.train_noisy_labels
 
         elif mode == 'test':
