@@ -254,29 +254,21 @@ def evaluate(loader, model, save = False, best_acc = 0.0):
 
     return acc
 
-def detection(loader, model):
+def detection(model):
     model.eval()    # Change model to 'eval' mode.
-    
-    correct = 0
-    total = 0
-    for batch_idx, (images, labels) in enumerate(loader):
-        images = torch.autograd.Variable(images).cuda()
-        logits = model(images)
-        outputs = F.softmax(logits, dim=1)
-        _, pred = torch.max(outputs.data, 1)
-        total += labels.size(0)
-        correct += (pred.cpu() == labels).sum()
-    acc = 100*float(correct)/float(total)
-    if save:
-        if acc > best_acc:
-            state = {'state_dict': model.state_dict(),
-                     'epoch':epoch,
-                     'acc':acc,
-            }
-            save_path= os.path.join('./', args.noise_type +'best.pth.tar')
-            torch.save(state,save_path)
-            best_acc = acc
-            print(f'model saved to {save_path}!')
+
+    pred_list = torch.zeros(50000, num_class)
+    num_class = 0
+    with torch.no_grad():
+        for batch_idx, (inputs, targets, index) in enumerate(eval_loader):
+            inputs, targets = inputs.cuda(), targets.cuda()
+            outputs = model(inputs)
+            targets_cpu = targets.cpu()
+            pred = torch.softmax(outputs, dim=1).cpu()
+            for b in range(inputs.size(0)):
+                targets_list[index[b]] = targets_cpu[b]
+                pred_list[index[b]] = pred[b]
+
 
     return acc
 
@@ -412,6 +404,8 @@ CEsoft = CE_Soft_Label()
 
 labeled_trainloader = None
 unlabeled_trainloader = None
+eval_loader = None
+idx2label = (torch.load(args.noise_path))[args.noise_type].reshape(-1)
 
 all_loss = [[], []]  # save the history of losses from two networks
 
