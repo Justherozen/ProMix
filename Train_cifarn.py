@@ -70,9 +70,9 @@ args.noise_type = noise_type_map[args.noise_type]
 # load dataset
 if args.data_path is None:
     if args.dataset == 'cifar10':
-        args.data_path = './cifar-10'
+        args.data_path = './data/cifar-10'
     elif args.dataset == 'cifar100':
-        args.data_path = './cifar-100'
+        args.data_path = './data/cifar-100'
     else:
         pass
 
@@ -429,8 +429,8 @@ labeled_trainloader = None
 unlabeled_trainloader = None
 eval_loader = None
 idx2label = (torch.load(args.noise_path))[args.noise_type].reshape(-1)
-test_loader = loader.run('test')
 eval_loader, noise_or_not = loader.run('eval_train')
+test_loader = loader.run('test')
 
 all_loss = [[], []]  # save the history of losses from two networks
 
