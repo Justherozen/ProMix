@@ -332,7 +332,6 @@ def eval_train(model, all_loss, rho, num_class):
     model.eval()
     losses = torch.zeros(50000)
     targets_list = torch.zeros(50000)
-    pred_list = torch.zeros(50000, num_class)
     num_class = 0
     with torch.no_grad():
         for batch_idx, (inputs, targets, index) in enumerate(eval_loader):
@@ -345,7 +344,6 @@ def eval_train(model, all_loss, rho, num_class):
             for b in range(inputs.size(0)):
                 losses[index[b]] = loss[b]
                 targets_list[index[b]] = targets_cpu[b]
-                pred_list[index[b]] = pred[b]
 
     losses = (losses - losses.min()) / (losses.max() - losses.min())
     all_loss.append(losses)

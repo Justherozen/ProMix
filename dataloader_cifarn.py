@@ -248,18 +248,6 @@ class cifarn_dataloader():
                 pin_memory=True,
                 drop_last=True)
 
-            unlabeled_dataset = cifarn_dataset(dataset=self.dataset, noise_type=self.noise_type,
-                                               noise_path=self.noise_path, is_human=self.is_human,
-                                               root_dir=self.root_dir, transform=self.transform_train, mode="unlabeled",
-                                               noise_file=self.noise_file, pred=pred,
-                                               transform_s=self.transform_train_s)
-            unlabeled_trainloader = DataLoader(
-                dataset=unlabeled_dataset,
-                batch_size=self.batch_size,
-                shuffle=True,
-                num_workers=self.num_workers,
-                pin_memory=True,
-                drop_last=True)
             return labeled_trainloader, labeled_dataset.train_noisy_labels
 
         elif mode == 'test':
