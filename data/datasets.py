@@ -36,7 +36,7 @@ def input_dataset(dataset, noise_type, noise_path, is_human, val_ratio = 0.1):
     if dataset == 'cifar10':
         num_classes = 10
 
-        train_dataset_full = CIFAR10(root='~/data/',
+        train_dataset_full = CIFAR10(root='./data/',
                                 download=True,  
                                 train=True, 
                                 transform = train_cifar10_transform,
@@ -45,7 +45,7 @@ def input_dataset(dataset, noise_type, noise_path, is_human, val_ratio = 0.1):
                                 is_human=is_human,
                            )
 
-        test_dataset = CIFAR10(root='~/data/',
+        test_dataset = CIFAR10(root='./data/',
                                 download=False,  
                                 train=False, 
                                 transform = test_cifar10_transform,
@@ -55,7 +55,7 @@ def input_dataset(dataset, noise_type, noise_path, is_human, val_ratio = 0.1):
         
     elif dataset == 'cifar100':
         num_classes = 100
-        train_dataset_full = CIFAR100(root='~/data/',
+        train_dataset_full = CIFAR100(root='./data/',
                                 download=True,  
                                 train=True, 
                                 transform=train_cifar100_transform,
@@ -65,7 +65,7 @@ def input_dataset(dataset, noise_type, noise_path, is_human, val_ratio = 0.1):
 
 
 
-        test_dataset = CIFAR100(root='~/data/',
+        test_dataset = CIFAR100(root='./data/',
                                 download=False,  
                                 train=False, 
                                 transform=test_cifar100_transform,

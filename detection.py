@@ -46,7 +46,7 @@ if args.noise_path is None:
 
 train_dataset, val_dataset, test_dataset, num_classes, num_training_samples = input_dataset(args.dataset,args.noise_type, args.noise_path, is_human = True, val_ratio = 0.0)
 
-YOUR_RESULT = np.load('detection.npy')
+YOUR_RESULT = np.load(args.noise_type + '_detection.npy')
 noisy_or_not_predict = YOUR_RESULT # should be your result. N-dim boolean numpy array
 
 # # The following two lines show one toy example.
