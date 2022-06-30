@@ -84,6 +84,27 @@ if args.noise_path is None:
     else:
         pass
 
+def high_conf_sel2(idx_chosen, w_x, batch_size, score1, score2, match):
+    w_x2 = w_x.clone()
+    if (1. * idx_chosen.shape[0] / batch_size) < args.threshold:
+        # when clean data is insufficient, try to incorporate more examples
+        high_conf_cond2 = (score1 > args.tau) * (score2 > args.tau) * match
+        # both nets agrees
+        high_conf_cond2 = (1. * high_conf_cond2 - w_x.squeeze()) > 0
+        # remove already selected examples; newly selected
+        hc2_idx = torch.where(high_conf_cond2)[0]
+
+        max_to_sel_num = int(batch_size * args.threshold) - idx_chosen.shape[0]
+        # maximally select batch_size * args.threshold; idx_chosen.shape[0] select already
+        if high_conf_cond2.sum() > max_to_sel_num:
+            # to many examples selected, remove some low conf examples
+            score_mean = (score1 + score2) / 2
+            idx_remove = (-score_mean[hc2_idx]).sort()[1][max_to_sel_num:]
+            # take top scores
+            high_conf_cond2[hc2_idx[idx_remove]] = False
+        w_x2[high_conf_cond2] = 1
+    return w_x2
+
 # Training
 def train(epoch, net, net2, optimizer, labeled_trainloader, unlabeled_trainloader):
     net.train()
@@ -274,7 +295,7 @@ def detection(model):
                 pred_list[index[b]] = pred[b]
     detect_res = pred_list.long().numpy() != idx2label
     precision, recall, fscore = evaluate_detection(detect_res, noise_or_not)
-    print("noisy - Precision: %.4f, Recall: %.4f, F1: %.4f" % (precision, recall, fscore))
+    print("===> Detection Results - Precision: %.4f, Recall: %.4f, F1: %.4f\n" % (precision, recall, fscore))
     np.save(args.noise_type + '_detection.npy', detect_res)
 
 def test(epoch, net1, net2):
@@ -437,7 +458,7 @@ for epoch in range(args.num_epochs + 1):
     test(epoch, dualnet.net1, dualnet.net2)
     torch.save(dualnet, f"./{args.dataset}_{args.noise_type}best.pth.tar")
     # regard the last ckpt as the best
-    if epoch % 10 == 0 and epoch > 300:
+    if epoch % 10 == 0 and epoch > args.num_epochs - 200:
         detection(dualnet)
 
     # best_acc = evaluate(test_loader, dualnet, save = False, best_acc = best_acc)
