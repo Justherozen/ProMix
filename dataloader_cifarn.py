@@ -10,7 +10,6 @@ import torch
 from data.utils import download_url, check_integrity
 import copy
 from randaug import *
-from data.cifar import CIFAR10, CIFAR100
 
 def unpickle(file):
     import _pickle as cPickle
@@ -34,11 +33,9 @@ class cifarn_dataset(Dataset):
         if dataset == 'cifar10':
             self.nb_classes = 10
             idx_each_class_noisy = [[] for i in range(10)]
-            CIFAR10(root='./data', download=True)
         elif dataset == 'cifar100':
             self.nb_classes = 100
             idx_each_class_noisy = [[] for i in range(100)]
-            CIFAR100(root='./data', download=True)
         if self.mode == 'test':
             if dataset == 'cifar10':
                 test_dic = unpickle('%s/test_batch' % root_dir)
