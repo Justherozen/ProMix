@@ -8,3 +8,4 @@ Epoch:6   Accuracy:78.03
 Epoch:7   Accuracy:81.03
 Epoch:8   Accuracy:80.25
 Epoch:9   Accuracy:74.82
+Epoch:10   Accuracy:82.18
