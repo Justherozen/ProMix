@@ -3,6 +3,22 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
+import random
+
+def set_global_seeds(i):
+    random.seed(i)
+    np.random.seed(i)
+    torch.manual_seed(i)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(i)
+
+def set_device():
+    if torch.cuda.is_available():
+        _device = torch.device("cuda")
+    else:
+        _device = torch.device("cpu")
+    print(f'Current device is {_device}', flush=True)
+    return _device
 
 class CE_Soft_Label(nn.Module):
     def __init__(self):

@@ -4,11 +4,12 @@ import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
 from data.datasets import input_dataset
-from models import *
+# from models import *
 from utils import *
 import argparse
 import time
 import os
+from PreResNet import *
 
 
 parser = argparse.ArgumentParser()
@@ -121,8 +122,8 @@ test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
 
 
 # we will test the model by the following code
-state_dict = torch.load(f"./{args.dataset}_{args.noise_type}best.pth.tar", map_location = "cpu")
-model.load_state_dict(state_dict['state_dict'])
+model = torch.load(f"./{args.dataset}_{args.noise_type}best.pth.tar", map_location = "cpu")
+# model.load_state_dict(state_dict)
 model.to(args.device)
 test_acc = evaluate(loader=test_loader, model=model, save = False)
 print(f'Best test acc selected by val is {test_acc}')

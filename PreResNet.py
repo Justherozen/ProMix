@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Parameter
 
+
 class DualNet(nn.Module):
     def __init__(self, num_class):
         super().__init__()
