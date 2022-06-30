@@ -3,6 +3,7 @@
 /data/__pycache__
 /data/cifar-100-python
 /data/cifar-10-batches-py
+/checkpoint/*.txt
 /__pycache__
 /cifar-10
 /cifar-100
