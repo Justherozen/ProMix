@@ -10,10 +10,9 @@ CUDA_VISIBLE_DEVICES=0 nohup python Train_cifarn.py --batch_size 256 --noise_typ
  --data_path ./cifar-10 --dataset cifar10 --num_class 10 --rho_range 0.5,0.5 --threshold 0.9 --tau 0.99\
  --pretrain_ep 10 --start_expand 150 > c10_worst.log &  
 
-
-CUDA_VISIBLE_DEVICES=0 nohup python Train_cifarn.py --batch_size 256 --noise_type noisy100 --num_epochs 420 --lr 0.05 --cosine\
+CUDA_VISIBLE_DEVICES=1 nohup python Train_cifarn.py --batch_size 256 --noise_type noisy100 --num_epochs 420 --lr 0.05 --cosine\
  --data_path ./cifar-100 --dataset cifar100 --num_class 100 --rho_range 0.5,0.5 --threshold 0.9 --tau 0.95\
- --pretrain_ep 30 --start_expand 150 > c10_worst.log &  
+ --pretrain_ep 30 --start_expand 150 > c100.log &  
 
 # For evluation (after running the above shells)
 python learning.py --dataset cifar10 --noise_type aggre --val_ratio 0.1 
