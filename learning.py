@@ -9,7 +9,7 @@ from utils import *
 import argparse
 import time
 import os
-from PreResNet import *
+from net import *
 
 
 parser = argparse.ArgumentParser()

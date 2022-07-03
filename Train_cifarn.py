@@ -9,7 +9,7 @@ import random
 import os
 import argparse
 import numpy as np
-from PreResNet import *
+from net import *
 from sklearn.mixture import GaussianMixture
 import dataloader_cifarn as dataloader
 from utils import *
