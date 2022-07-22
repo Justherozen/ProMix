@@ -2,6 +2,8 @@
 
 Winner of the 1st Learning and Mining with Noisy Labels Challenge ([link](http://competition.noisylabels.com/)) in IJCAI-ECAI 2022.
 
+The technical report of our work can be found [here](http://competition.noisylabels.com/).
+
 <b>Title</b>: ProMix: Combating Label Noise via Maximizing Clean Sample Utility \
 <b>Authors</b>: Haobo Wang*, Ruixuan Xiao*, Yiwen Dong, Lei Feng, Junbo Zhao \
 <b>Institute</b>: Zhejiang University, Chongqing Unveristy
