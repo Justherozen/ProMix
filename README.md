@@ -2,6 +2,12 @@
 
 Winner of the 1st Learning and Mining with Noisy Labels Challenge ([link](http://competition.noisylabels.com/)) in IJCAI-ECAI 2022.
 
+**Ranks**:
+- 1st under Task1 (Image Classification, CIFAR-10N);
+- 1st under Task1 (Image Classification, CIFAR-100N);
+- 1st under Task2 (Label Noise Detection, CIFAR-10N);
+- 1st under Task2 (Label Noise Detection, CIFAR-100N);
+
 The technical report of our work can be found [here](https://arxiv.org/abs/2207.10276).
 
 <b>Title</b>: ProMix: Combating Label Noise via Maximizing Clean Sample Utility \
