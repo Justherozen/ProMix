@@ -1,33 +1,22 @@
-CUDA_VISIBLE_DEVICES=0 nohup python Train_cifarn.py --batch_size 256 --noise_type aggre --num_epochs 420 --lr 0.05 --cosine\
- --dataset cifar10 --num_class 10 --rho_range 0.5,0.5 --threshold 0.9 --tau 0.99 --pretrain_ep 10 --start_expand 150\
- --data_path ~/data/cifar-10 --noise_path ~/data/CIFAR-10_human.pt > c10_aggre.log &  
+# For CIFAR-10-Symmetric
+python Train_promix.py --cosine --dataset cifar10 --num_class 10 --rho_range 0.7,0.7 --tau 0.99 --pretrain_ep 10 --debias_output 0.8 --debias_pl 0.8  --noise_mode sym --noise_rate 0.2
+python Train_promix.py --cosine --dataset cifar10 --num_class 10 --rho_range 0.5,0.5 --tau 0.99 --pretrain_ep 10 --debias_output 0.8 --debias_pl 0.8  --noise_mode sym --noise_rate 0.5
 
-CUDA_VISIBLE_DEVICES=0 nohup python Train_cifarn.py --batch_size 256 --noise_type rand1 --num_epochs 420 --lr 0.05 --cosine\
- --dataset cifar10 --num_class 10 --rho_range 0.5,0.5 --threshold 0.9 --tau 0.99 --pretrain_ep 10 --start_expand 150\
- --data_path ~/data/cifar-10 --noise_path ~/data/CIFAR-10_human.pt > c10_rand1.log &  
+# For CIFAR-10-Asymmetric
+python Train_promix.py --cosine --dataset cifar10 --num_class 10 --rho_range 0.5,0.5 --tau 0.99 --pretrain_ep 10 --debias_output 0.8 --debias_pl 0.8  --noise_mode asym --noise_rate 0.4
 
-CUDA_VISIBLE_DEVICES=0 nohup python Train_cifarn.py --batch_size 256 --noise_type worst --num_epochs 420 --lr 0.05 --cosine\
- --dataset cifar10 --num_class 10 --rho_range 0.5,0.5 --threshold 0.9 --tau 0.99 --pretrain_ep 10 --start_expand 150\
- --data_path ~/data/cifar-10 --noise_path ~/data/CIFAR-10_human.pt > c10_worst.log &
+# For CIFAR-100-Symmetric
+python Train_promix.py --cosine --dataset cifar100 --num_class 100 --rho_range 0.7,0.7 --tau 0.95 --pretrain_ep 30 --debias_output 0.5 --debias_pl 0.5  --noise_mode sym --noise_rate 0.2
+python Train_promix.py --cosine --dataset cifar100 --num_class 100 --rho_range 0.5,0.5 --tau 0.95 --pretrain_ep 30 --debias_output 0.5 --debias_pl 0.5  --noise_mode sym --noise_rate 0.5
 
-CUDA_VISIBLE_DEVICES=1 nohup python Train_cifarn.py --batch_size 256 --noise_type noisy100 --num_epochs 420 --lr 0.05 --cosine\
- --dataset cifar100 --num_class 100 --rho_range 0.5,0.5 --threshold 0.9 --tau 0.95 --pretrain_ep 30 --start_expand 150\
- --data_path ~/data/cifar-100 --noise_path ~/data/CIFAR-100_human.pt > c100.log &  
+# For CIFAR-10N 
+#aggre
+python Train_promix.py --noise_type aggre --cosine --dataset cifar10 --num_class 10 --rho_range 0.5,0.5 --tau 0.99 --pretrain_ep 10  --noise_mode cifarn
+#rand1
+python Train_promix.py --noise_type rand1 --cosine --dataset cifar10 --num_class 10 --rho_range 0.5,0.5 --tau 0.99 --pretrain_ep 10  --noise_mode cifarn
+#worst
+python Train_promix.py --noise_type worst --cosine --dataset cifar10 --num_class 10 --rho_range 0.5,0.5 --tau 0.99 --pretrain_ep 10  --noise_mode cifarn
 
-# For evluation (after running the above shells)
-python learning.py --dataset cifar10 --noise_type aggre --val_ratio 0.1 
+# For CIFAR-100N
+python Train_promix.py --noise_type noisy100 --cosine --dataset cifar100 --num_class 100 --rho_range 0.5,0.5 --tau 0.95 --pretrain_ep 30 --debias_output 0.5 --debias_pl 0.5 --noise_mode cifarn
 
-python learning.py --dataset cifar10 --noise_type rand1 --val_ratio 0.1 
-
-python learning.py --dataset cifar10 --noise_type worst --val_ratio 0.1 
-
-python learning.py --dataset cifar100 --noise_type noisy100 --val_ratio 0.1 
-
-# For detection (after running the above shells)
-python detection.py --dataset cifar10 --noise_type aggre --val_ratio 0.1 
-
-python detection.py --dataset cifar10 --noise_type rand1 --val_ratio 0.1 
-
-python detection.py --dataset cifar10 --noise_type worst --val_ratio 0.1 
-
-python detection.py --dataset cifar100 --noise_type noisy100 --val_ratio 0.1 

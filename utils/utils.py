@@ -5,6 +5,29 @@ import torch.nn.functional as F
 import math
 import random
 
+def debias_pl(logit,bias,tau=0.4):
+    bias = bias.detach().clone()
+    debiased_prob = F.softmax(logit - tau*torch.log(bias), dim=1)
+    return debiased_prob
+
+
+def debias_output(logit, bias, tau=0.8):
+    bias = bias.detach().clone()
+    debiased_opt = logit + tau*torch.log(bias)
+    return debiased_opt
+
+def bias_initial(num_class=10):
+    bias = (torch.ones(num_class, dtype=torch.float)/num_class).cuda()
+    return bias
+
+def bias_update(input, bias, momentum, bias_mask=None):
+    if bias_mask is not None:
+        input_mean = input.detach()*bias_mask.detach().unsqueeze(dim=-1)
+    else:
+        input_mean = input.detach().mean(dim=0)
+    bias = momentum * bias + (1 - momentum) * input_mean
+    return bias
+
 def set_global_seeds(i):
     random.seed(i)
     np.random.seed(i)
@@ -23,11 +46,8 @@ def set_device():
 class CE_Soft_Label(nn.Module):
     def __init__(self):
         super().__init__()
-        # print('Calculating uniform targets...')
-        # calculate confidence
         self.confidence = None
-        self.gamma = 2.0
-        self.alpha = 0.25
+
     def init_confidence(self, noisy_labels, num_class):
         noisy_labels = torch.Tensor(noisy_labels).long().cuda()
         self.confidence = F.one_hot(noisy_labels, num_class).float().clone().detach()
@@ -36,8 +56,6 @@ class CE_Soft_Label(nn.Module):
         logsm_outputs = F.log_softmax(outputs, dim=1)
         final_outputs = logsm_outputs * targets.detach()
         loss_vec = - ((final_outputs).sum(dim=1))
-        #p = torch.exp(-loss_vec)
-        #loss_vec =  (1 - p) ** self.gamma * loss_vec
         average_loss = loss_vec.mean()
         return loss_vec
 

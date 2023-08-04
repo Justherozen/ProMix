@@ -155,6 +155,7 @@ class ResNet(nn.Module):
                 nn.ReLU(inplace=True),
                 nn.Linear(dim_in, feat_dim)
             )
+        self.pseudo_linear = nn.Linear(dim_in, num_classes)
         
     def reset_classifier_and_stop_grad(self):
         self.linear.apply(init_weights)
@@ -171,7 +172,7 @@ class ResNet(nn.Module):
             self.in_planes = planes * block.expansion
         return nn.Sequential(*layers)
 
-    def forward(self, x, train=False):
+    def forward(self, x, train=False,use_ph=False):
         out = F.relu(self.bn1(self.conv1(x)))
         out = self.layer1(out)
         out = self.layer2(out)
@@ -183,9 +184,18 @@ class ResNet(nn.Module):
 
         if train:
             feat_c = self.head(out)
-            return out_linear, F.normalize(feat_c, dim=1)
+            if use_ph:
+                out_linear_debias = self.pseudo_linear(out)
+                return out_linear, out_linear_debias, F.normalize(feat_c, dim=1)
+            else:
+                return out_linear, F.normalize(feat_c, dim=1)
         else:
-            return out_linear
+            if use_ph:
+                out_linear_debias = self.pseudo_linear(out)
+                return out_linear, out_linear_debias
+            else:
+                return out_linear
+
 
 def ResNet18(**kwargs):
     return ResNet(BasicBlock, [2, 2, 2, 2], **kwargs)

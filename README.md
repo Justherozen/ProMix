@@ -1,29 +1,46 @@
 # ProMix: Combating Label Noise via Maximizing Clean Sample Utility
 
-Winner of the 1st Learning and Mining with Noisy Labels Challenge ([link](http://competition.noisylabels.com/)) in IJCAI-ECAI 2022.
+This is the [PyTorch](http://pytorch.org/) implementation of our IJCAI 2023 paper [ProMix](https://arxiv.org/abs/2207.10276). A previous version at the `LMNL_challenge` branch won the [1st Learning and Mining with Noisy Labels Challenge](http://competition.noisylabels.com/) in IJCAI-ECAI 2022.
 
-**Ranks**:
-- 1st under Task1 (Image Classification, CIFAR-10N);
-- 1st under Task1 (Image Classification, CIFAR-100N);
-- 1st under Task2 (Label Noise Detection, CIFAR-10N);
-- 1st under Task2 (Label Noise Detection, CIFAR-100N);
+**Title:** ProMix: Combating Label Noise via Maximizing Clean Sample Utility
 
-The technical report of our work can be found [here](https://arxiv.org/abs/2207.10276).
+**Authors:** Ruixuan Xiao, Dong Yiwen, Haobo Wang, Lei Feng, Runze Wu, Gang Chen, Junbo Zhao
 
-<b>Title</b>: ProMix: Combating Label Noise via Maximizing Clean Sample Utility \
-<b>Authors</b>: Haobo Wang*, Ruixuan Xiao*, Yiwen Dong, Lei Feng, Junbo Zhao \
-<b>Institute</b>: Zhejiang University, Chongqing Unveristy
+**Affliations:** Zhejiang University, Nanyang Technological University, NetEase Fuxi AI Lab
 
-The shell codes are provided in ```run.sh```. Please correctly set the data path arguments.
+
 
 ### Framework
 ![Framework](./resources/framework.png)
 
-### Main Results
-Accuracy comparisons on CIFAR-10N and CIFAR-100N under different noise types.
 
-![Results](./resources/results.png)
 
-Detection ability of ProMix on CIFAR-10N datasets. Noise detection indicates the wrongly-labeled data are regarded as positive, and clean detection regards correctly-labeled ones as positive.
+### Main Results on CIFAR-10/100
 
-![Results](./resources/results_detection.png)
+![result_cf](./resources/result_cf.png)
+
+
+
+### Main Results on CIFAR-N
+
+![result_cfn](./resources/result_cfn.png)
+
+
+
+### Usage
+
+After creating a virtual environment, run
+
+```
+pip install -r requirements.txt
+```
+
+We provide the shell codes for model training in the `run.sh` file. Please download the source data of CIFAR-10/100 and the noise file of CIFAR-N following [Learning with Noisy Labels Revisited: A Study Using Real-World Human Annotations](https://github.com/UCSC-REAL/cifar-10-100n) and put them under the `data` folder.
+
+
+
+
+
+###  Acknowledgement
+This paper is supported by [Netease Youling Crowdsourcing Platform](https://fuxi.163.com). As the importance of data continues rising, Netease Youling Crowdsourcing Platform is dedicated to utilizing various advanced algorithms to provide high-quality, low-noise labeled samples. Feel free to contact us for more information.
+
