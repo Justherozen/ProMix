@@ -8,7 +8,23 @@ This is the [PyTorch](http://pytorch.org/) implementation of our IJCAI 2023 pape
 
 **Affliations:** Zhejiang University, Nanyang Technological University, NetEase Fuxi AI Lab
 
+```
+@inproceedings{ijcai2023p494,
+  title     = {ProMix: Combating Label Noise via Maximizing Clean Sample Utility},
+  author    = {Xiao, Ruixuan and Dong, Yiwen and Wang, Haobo and Feng, Lei and Wu, Runze and Chen, Gang and Zhao, Junbo},
+  booktitle = {Proceedings of the Thirty-Second International Joint Conference on
+               Artificial Intelligence, {IJCAI-23}},
+  publisher = {International Joint Conferences on Artificial Intelligence Organization},
+  editor    = {Edith Elkind},
+  pages     = {4442--4450},
+  year      = {2023},
+  month     = {8},
+  note      = {Main Track},
+  doi       = {10.24963/ijcai.2023/494},
+  url       = {https://doi.org/10.24963/ijcai.2023/494},
+}
 
+```
 
 ### Framework
 ![Framework](./resources/framework.png)
