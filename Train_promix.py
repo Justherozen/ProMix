@@ -128,8 +128,8 @@ def train(epoch, net, net2, optimizer, labeled_trainloader, pi1, pi2, pi1_unrel,
         w_x = w_x.view(-1, 1).type(torch.FloatTensor)
         w_x2 = w_x2.view(-1, 1).type(torch.FloatTensor)
 
-        # inputs_x: strong augmentation
-        # inputs_x2: weak augmentation
+        # inputs_x: weak augmentation
+        # inputs_x2: strong augmentation
         inputs_x, inputs_x2, labels_x, w_x , w_x2= inputs_x.cuda(), inputs_x2.cuda(), labels_x.cuda(), w_x.cuda(), w_x2.cuda()
         outputs_x, outputs_x_ph, _ = net(inputs_x,train=True,use_ph=True)
         outputs_x2, outputs_x2_ph, _ = net(inputs_x2,train=True,use_ph=True)
